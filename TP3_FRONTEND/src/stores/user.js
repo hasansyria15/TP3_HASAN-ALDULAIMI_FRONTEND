@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { getAuthHeaders, handleHttpError } from '@/utils/api'
 
 export const useUserStore = defineStore('user', () => {
     // État
@@ -10,14 +11,9 @@ export const useUserStore = defineStore('user', () => {
     const API = import.meta.env.VITE_API_URL
 
     /**
-     * Récupère le token depuis localStorage
-     */
-    function getToken() {
-        return localStorage.getItem('token')
-    }
-
-    /**
      * GET - Récupérer le profil de l'utilisateur connecté
+     * Status attendu: 200 OK
+     * Nécessite: Authorization Bearer <token>
      */
     async function fetchProfile() {
         isLoading.value = true
@@ -25,17 +21,14 @@ export const useUserStore = defineStore('user', () => {
         try {
             const response = await fetch(`${API}/api/users/profile`, {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: getAuthHeaders()
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de la récupération du profil')
+                throw await handleHttpError(response)
             }
 
+            // 200 OK
             const data = await response.json()
             profile.value = data
             return data
@@ -49,6 +42,8 @@ export const useUserStore = defineStore('user', () => {
 
     /**
      * PUT - Modifier le profil de l'utilisateur connecté
+     * Status attendu: 200 OK
+     * Nécessite: Authorization Bearer <token>
      */
     async function updateProfile(userData) {
         isLoading.value = true
@@ -56,18 +51,15 @@ export const useUserStore = defineStore('user', () => {
         try {
             const response = await fetch(`${API}/api/users/profile`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(userData)
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de la modification du profil')
+                throw await handleHttpError(response)
             }
 
+            // 200 OK
             const data = await response.json()
             profile.value = data
             return data
@@ -81,6 +73,8 @@ export const useUserStore = defineStore('user', () => {
 
     /**
      * DELETE - Supprimer le compte de l'utilisateur connecté
+     * Status attendu: 204 No Content ou 200 OK
+     * Nécessite: Authorization Bearer <token>
      */
     async function deleteProfile() {
         isLoading.value = true
@@ -88,17 +82,14 @@ export const useUserStore = defineStore('user', () => {
         try {
             const response = await fetch(`${API}/api/users/profile`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: getAuthHeaders()
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de la suppression du compte')
+                throw await handleHttpError(response)
             }
 
+            // 204 No Content ou 200 OK
             profile.value = null
             return true
         } catch (err) {

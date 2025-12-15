@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { apiGet, apiPost, apiPut, apiDelete, getAuthHeaders, handleHttpError } from '@/utils/api'
 
 export const useCartStore = defineStore('cart', () => {
     // État
@@ -8,23 +9,6 @@ export const useCartStore = defineStore('cart', () => {
     const error = ref(null)
 
     const API = import.meta.env.VITE_API_URL
-
-    /**
-     * Récupère le token depuis localStorage
-     */
-    function getToken() {
-        return localStorage.getItem('token')
-    }
-
-    /**
-     * Headers avec authentification
-     */
-    function getHeaders() {
-        return {
-            'Authorization': `Bearer ${getToken()}`,
-            'Content-Type': 'application/json'
-        }
-    }
 
     /**
      * Total général du panier
@@ -44,6 +28,8 @@ export const useCartStore = defineStore('cart', () => {
 
     /**
      * GET - Récupérer le panier
+     * Status attendu: 200 OK
+     * Nécessite: Authorization Bearer <token>
      */
     async function fetchCart() {
         isLoading.value = true
@@ -51,16 +37,15 @@ export const useCartStore = defineStore('cart', () => {
         try {
             const response = await fetch(`${API}/api/panier`, {
                 method: 'GET',
-                headers: getHeaders()
+                headers: getAuthHeaders()
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de la récupération du panier')
+                throw await handleHttpError(response)
             }
 
+            // 200 OK
             const data = await response.json()
-            // Adapter selon la structure de la réponse API
             items.value = data.items || data || []
             return data
         } catch (err) {
@@ -73,6 +58,8 @@ export const useCartStore = defineStore('cart', () => {
 
     /**
      * POST - Ajouter un article au panier
+     * Status attendu: 201 Created
+     * Nécessite: Authorization Bearer <token>
      */
     async function addToCart(livreId, quantite = 1) {
         isLoading.value = true
@@ -80,17 +67,16 @@ export const useCartStore = defineStore('cart', () => {
         try {
             const response = await fetch(`${API}/api/panier`, {
                 method: 'POST',
-                headers: getHeaders(),
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ livreId, quantite })
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de l\'ajout au panier')
+                throw await handleHttpError(response)
             }
 
+            // 201 Created
             const data = await response.json()
-            // Recharger le panier après ajout
             await fetchCart()
             return data
         } catch (err) {
@@ -103,6 +89,8 @@ export const useCartStore = defineStore('cart', () => {
 
     /**
      * POST - Mettre à jour la quantité d'un article
+     * Status attendu: 200 OK ou 201 Created
+     * Nécessite: Authorization Bearer <token>
      */
     async function updateQuantity(livreId, quantite) {
         isLoading.value = true
@@ -110,15 +98,15 @@ export const useCartStore = defineStore('cart', () => {
         try {
             const response = await fetch(`${API}/api/panier`, {
                 method: 'POST',
-                headers: getHeaders(),
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ livreId, quantite })
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Stock insuffisant')
+                throw await handleHttpError(response)
             }
 
+            // 200 OK ou 201 Created
             const data = await response.json()
             await fetchCart()
             return data
@@ -132,6 +120,8 @@ export const useCartStore = defineStore('cart', () => {
 
     /**
      * DELETE - Retirer un article du panier
+     * Status attendu: 204 No Content ou 200 OK
+     * Nécessite: Authorization Bearer <token>
      */
     async function removeItem(livreId) {
         isLoading.value = true
@@ -139,14 +129,14 @@ export const useCartStore = defineStore('cart', () => {
         try {
             const response = await fetch(`${API}/api/panier/items/${livreId}`, {
                 method: 'DELETE',
-                headers: getHeaders()
+                headers: getAuthHeaders()
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de la suppression')
+                throw await handleHttpError(response)
             }
 
+            // 204 No Content ou 200 OK
             await fetchCart()
             return true
         } catch (err) {
@@ -159,6 +149,8 @@ export const useCartStore = defineStore('cart', () => {
 
     /**
      * DELETE - Vider le panier entièrement
+     * Status attendu: 204 No Content ou 200 OK
+     * Nécessite: Authorization Bearer <token>
      */
     async function clearCart() {
         isLoading.value = true
@@ -166,14 +158,14 @@ export const useCartStore = defineStore('cart', () => {
         try {
             const response = await fetch(`${API}/api/panier`, {
                 method: 'DELETE',
-                headers: getHeaders()
+                headers: getAuthHeaders()
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors du vidage du panier')
+                throw await handleHttpError(response)
             }
 
+            // 204 No Content ou 200 OK
             items.value = []
             return true
         } catch (err) {

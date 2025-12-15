@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { jwtDecode } from "jwt-decode";
 import { ref, computed } from 'vue'
+import { apiPost, handleHttpError } from '@/utils/api'
 
 export const useAuthStore = defineStore('auth', () => {
 
@@ -8,9 +9,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     const isAuthenticated = computed(() => {
         if (token.value) {
-            const decoded = jwtDecode(token.value)
-            const now = Date.now() / 1000
-            return decoded.exp > now
+            try {
+                const decoded = jwtDecode(token.value)
+                const now = Date.now() / 1000
+                return decoded.exp > now
+            } catch {
+                return false
+            }
         }
         return false
     })
@@ -18,14 +23,18 @@ export const useAuthStore = defineStore('auth', () => {
     // Current user
     const currentUser = computed(() => {
         if (token.value) {
-            const decoded = jwtDecode(token.value)
-            return {
-                id: decoded.sub,
-                username: decoded.username,
-                email: decoded.email,
-                first_name: decoded.first_name,
-                last_name: decoded.last_name,
-                is_admin: decoded.is_admin || false
+            try {
+                const decoded = jwtDecode(token.value)
+                return {
+                    id: decoded.sub,
+                    username: decoded.username,
+                    email: decoded.email,
+                    first_name: decoded.first_name,
+                    last_name: decoded.last_name,
+                    is_admin: decoded.is_admin || false
+                }
+            } catch {
+                return null
             }
         }
         return null
@@ -34,16 +43,22 @@ export const useAuthStore = defineStore('auth', () => {
     // Vérifier si l'utilisateur est admin
     const isAdmin = computed(() => {
         if (token.value) {
-            const decoded = jwtDecode(token.value)
-            return decoded.is_admin === true
+            try {
+                const decoded = jwtDecode(token.value)
+                return decoded.is_admin === true
+            } catch {
+                return false
+            }
         }
         return false
     })
 
-
-
     const API = import.meta.env.VITE_API_URL
 
+    /**
+     * Inscription d'un nouvel utilisateur
+     * Status attendu: 201 Created
+     */
     async function Signup(credentials) {
         try {
             const response = await fetch(`${API}/auth/signup`, {
@@ -59,20 +74,24 @@ export const useAuthStore = defineStore('auth', () => {
                     password: credentials.password
                 })
             })
+
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.message || 'Erreur lors de l\'inscription')
+                throw await handleHttpError(response)
             }
 
+            // 201 Created
             const data = await response.json()
             return data
         } catch (error) {
-            console.log('Signup error:', error)
-            throw error;
+            console.error('Signup error:', error)
+            throw error
         }
     }
 
-
+    /**
+     * Connexion d'un utilisateur
+     * Status attendu: 200 OK
+     */
     async function login(credentials) {
         try {
             const response = await fetch(`${API}/auth/login`, {
@@ -85,19 +104,20 @@ export const useAuthStore = defineStore('auth', () => {
                     password: credentials.password
                 })
             })
+
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error('Email ou mot de passe incorrect')
+                throw await handleHttpError(response)
             }
 
+            // 200 OK
             const data = await response.json()
             token.value = data.token
-
             localStorage.setItem('token', data.token)
 
+            return data
         } catch (error) {
-            console.log('Login error:', error)
-            throw error;
+            console.error('Login error:', error)
+            throw error
         }
     }
 

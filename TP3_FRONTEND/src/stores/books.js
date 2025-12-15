@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { apiGet, apiPost, handleHttpError } from '@/utils/api'
 
 export const useBooksStore = defineStore('books', () => {
     // État
@@ -116,6 +117,8 @@ export const useBooksStore = defineStore('books', () => {
 
     /**
      * Crée un nouveau livre (admin uniquement)
+     * Status attendu: 201 Created
+     * Nécessite: Authorization Bearer <token>
      */
     async function createBook(bookData) {
         try {
@@ -130,10 +133,10 @@ export const useBooksStore = defineStore('books', () => {
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw errorData
+                throw await handleHttpError(response)
             }
 
+            // 201 Created
             const data = await response.json()
             return data
         } catch (error) {
