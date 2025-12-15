@@ -90,5 +90,6 @@ Puis ouvrir dans le navigateur :
 http://localhost:5173
 ```
 
-## L'URL de la documentation Postman
-documenter.getpostman.com/view/50807368/2sB3dTsTPZ
+## 🔗 Documentation de l’API (Postman)
+
+👉 [Consulter la documentation Postman](https://documenter.getpostman.com/view/50807368/2sB3dTsTPZ)
