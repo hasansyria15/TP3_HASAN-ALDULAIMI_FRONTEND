@@ -35,30 +35,38 @@
 
           <!-- Auteurs -->
           <div class="form-group">
-            <label for="auteurs">Auteurs (IDs séparés par virgule) <span class="required">*</span></label>
-            <input
-              type="text"
-              id="auteurs"
-              v-model="form.auteurs"
-              :class="{ 'is-invalid': errors.auteurs }"
-              placeholder="Ex: 64a1b2c3d4e5f6g7h8i9j0k1, 64a1b2c3d4e5f6g7h8i9j0k2"
-            />
+            <label>Auteurs <span class="required">*</span></label>
+            <div class="checkbox-group" :class="{ 'is-invalid': errors.auteurs }">
+              <div v-for="author in availableAuthors" :key="author._id" class="checkbox-item">
+                <input
+                  type="checkbox"
+                  :id="'author-' + author._id"
+                  :value="author._id"
+                  v-model="form.auteurs"
+                />
+                <label :for="'author-' + author._id">{{ author.nom }}</label>
+              </div>
+            </div>
             <span v-if="errors.auteurs" class="error-message">{{ errors.auteurs }}</span>
-            <small class="hint">Entrez les IDs des auteurs séparés par des virgules</small>
+            <small class="hint">Sélectionnez un ou plusieurs auteurs</small>
           </div>
 
           <!-- Catégories -->
           <div class="form-group">
-            <label for="categories">Catégories (IDs séparés par virgule)</label>
-            <input
-              type="text"
-              id="categories"
-              v-model="form.categories"
-              :class="{ 'is-invalid': errors.categories }"
-              placeholder="Ex: 64a1b2c3d4e5f6g7h8i9j0k3"
-            />
+            <label>Catégories <span class="required">*</span></label>
+            <div class="checkbox-group" :class="{ 'is-invalid': errors.categories }">
+              <div v-for="category in availableCategories" :key="category._id" class="checkbox-item">
+                <input
+                  type="checkbox"
+                  :id="'category-' + category._id"
+                  :value="category._id"
+                  v-model="form.categories"
+                />
+                <label :for="'category-' + category._id">{{ category.nom }}</label>
+              </div>
+            </div>
             <span v-if="errors.categories" class="error-message">{{ errors.categories }}</span>
-            <small class="hint">Entrez les IDs des catégories séparés par des virgules (optionnel)</small>
+            <small class="hint">Sélectionnez une ou plusieurs catégories</small>
           </div>
 
           <!-- ISBN -->
@@ -72,19 +80,6 @@
               placeholder="Ex: 978-2-1234-5678-9"
             />
             <span v-if="errors.isbn" class="error-message">{{ errors.isbn }}</span>
-          </div>
-
-          <!-- Éditeur -->
-          <div class="form-group">
-            <label for="editeur">Éditeur</label>
-            <input
-              type="text"
-              id="editeur"
-              v-model="form.editeur"
-              :class="{ 'is-invalid': errors.editeur }"
-              placeholder="Nom de l'éditeur"
-            />
-            <span v-if="errors.editeur" class="error-message">{{ errors.editeur }}</span>
           </div>
 
           <!-- Prix et Quantité en ligne -->
@@ -150,20 +145,23 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBooksStore } from '@/stores/books'
 
 const router = useRouter()
 const booksStore = useBooksStore()
 
+// Listes pour les sélections
+const availableAuthors = ref([])
+const availableCategories = ref([])
+
 // État du formulaire
 const form = reactive({
   titre: '',
-  auteurs: '',
-  categories: '',
+  auteurs: [],
+  categories: [],
   isbn: '',
-  editeur: '',
   prix: null,
   quantite: null,
   couverture: '',
@@ -175,7 +173,6 @@ const errors = reactive({
   auteurs: '',
   categories: '',
   isbn: '',
-  editeur: '',
   prix: '',
   quantite: '',
   couverture: '',
@@ -184,6 +181,42 @@ const errors = reactive({
 const isSubmitting = ref(false)
 const generalError = ref('')
 const successMessage = ref('')
+
+const API = import.meta.env.VITE_API_URL
+
+/**
+ * Charge les auteurs depuis l'API
+ */
+async function fetchAuthors() {
+  try {
+    const response = await fetch(`${API}/api/auteurs`)
+    if (!response.ok) throw new Error('Erreur lors de la récupération des auteurs')
+    const data = await response.json()
+    availableAuthors.value = data.data || data || []
+  } catch (error) {
+    console.error('Erreur fetchAuthors:', error)
+  }
+}
+
+/**
+ * Charge les catégories depuis l'API
+ */
+async function fetchCategories() {
+  try {
+    const response = await fetch(`${API}/api/categories`)
+    if (!response.ok) throw new Error('Erreur lors de la récupération des catégories')
+    const data = await response.json()
+    availableCategories.value = data.data || data || []
+  } catch (error) {
+    console.error('Erreur fetchCategories:', error)
+  }
+}
+
+// Charger les données au montage
+onMounted(() => {
+  fetchAuthors()
+  fetchCategories()
+})
 
 /**
  * Réinitialise les erreurs
@@ -207,8 +240,14 @@ function validateForm() {
   }
 
   // Auteurs requis
-  if (!form.auteurs.trim()) {
+  if (!form.auteurs.length) {
     errors.auteurs = 'Au moins un auteur est requis'
+    isValid = false
+  }
+
+  // Catégories requises
+  if (!form.categories.length) {
+    errors.categories = 'Au moins une catégorie est requise'
     isValid = false
   }
 
@@ -258,14 +297,6 @@ function isValidUrl(string) {
 }
 
 /**
- * Convertit une chaîne d'IDs en tableau
- */
-function parseIds(str) {
-  if (!str.trim()) return []
-  return str.split(',').map(id => id.trim()).filter(id => id)
-}
-
-/**
  * Soumet le formulaire
  */
 async function submitForm() {
@@ -279,27 +310,18 @@ async function submitForm() {
     // Préparer les données
     const bookData = {
       titre: form.titre.trim(),
-      auteurs: parseIds(form.auteurs),
+      auteurs: form.auteurs,
       isbn: form.isbn.trim(),
       prix: Number(form.prix),
       quantite: Number(form.quantite)
     }
 
-    // Champs optionnels
-    if (form.categories.trim()) {
-      bookData.categories = parseIds(form.categories)
-    }
-    if (form.editeur.trim()) {
-      bookData.editeur = form.editeur.trim()
-    }
-    if (form.datePublication) {
-      bookData.datePublication = form.datePublication
-    }
-    if (form.couverture.trim()) {
+    // Catégories (maintenant obligatoires)
+    bookData.categories = form.categories
+
+    // Couverture (optionnelle)
+    if (form.couverture && form.couverture.trim()) {
       bookData.couverture = form.couverture.trim()
-    }
-    if (form.resume.trim()) {
-      bookData.resume = form.resume.trim()
     }
 
     await booksStore.createBook(bookData)
@@ -462,6 +484,49 @@ function goBack() {
   color: #757575;
   font-size: 0.8rem;
   margin-top: 4px;
+}
+
+/* Groupes de checkboxes */
+.checkbox-group {
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafafa;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.checkbox-group.is-invalid {
+  border-color: #c62828;
+  background: #fff5f5;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.checkbox-item:hover {
+  background: #f0f0f0;
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #000;
+}
+
+.checkbox-item label {
+  margin: 0;
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 0.95rem;
+  flex: 1;
 }
 
 /* Ligne de formulaire (prix + quantité) */
